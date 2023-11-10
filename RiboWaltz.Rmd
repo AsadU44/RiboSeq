@@ -1,0 +1,239 @@
+---
+title: "RiboWaltz Tutorial"
+author: "Asad"
+date: "2023-11-10"
+output: pdf_document
+---
+
+
+```{r}
+#Call libraries
+library(riboWaltz)
+#Set working directory
+setwd('D:/CancerData')
+
+#Read data
+load("C:/Users/HP/Downloads/reads_list.RData")
+#Example data
+```
+
+
+```{r}
+head(reads_list)
+
+reads_list[["Samp_example"]]
+
+#Filtering
+filtered_list <- duplicates_filter(data =reads_list,
+                                   extremity = "both")
+filtered_list[["Samp_example"]]
+
+#Maybe this is a filtered data. 
+
+#Additional ways of filtering
+filtered_list <- duplicates_filter(data = reads_list,
+                                   extremity = "5end",
+                                   keep = "shortest")
+filtered_list[["Samp_example"]]
+```
+
+```{r}
+#Computing P-site offsets and updating dataset
+psite_offset <- psite(reads_list, flanking = 6, extremity = "auto")
+reads_psite_list <- psite_info(reads_list, psite_offset)
+```
+#The PO is defined as the distance between the extremities of a read and the  first nucleotide of the P-site itself. psite processes all samples separately starting from reads mapping on the reference codon (either the start codon or the second to last codon, specified by start) of any annotated coding sequences
+
+
+#Codon Coverage
+#codon_coverage computes the number of read footprints or P-sites mapping on each triplet of annotated coding sequences and UTRs. Such data can be exploited to generate occupancy profiles at codon resolution showing the abundance of ribosome protected fragments along single transcripts
+```{r}
+codon_coverage_example <- codon_coverage(reads_psite_list, mm81cdna, psite = FALSE)
+```
+
+#CDS and transcript coverage
+```{r}
+example_length_dist <- rlength_distr(reads_list, sample = "Samp1")
+example_length_dist[["plot_Samp1"]]
+cds_coverage_example <- cds_coverage(reads_psite_list, mm81cdna)
+```
+
+```{r}
+#Data quality inspection
+example_length_dist_zoom <- rlength_distr(reads_list, sample = "Samp1", cl = 99)
+example_length_dist_zoom[["plot_Samp1"]]
+```
+
+```{r}
+#Alternative way
+reads_list[["Samp2"]] <- reads_list[["Samp1"]][sample(.N, 1000)]
+example_length_dist_rep <- rlength_distr(reads_list,
+                                         sample = list("Samp_avg" = c("Samp1", "Samp2")),
+                                         cl = 99, multisamples = "average",
+                                         colour = "gray70")
+example_length_dist_rep[["plot"]]
+```
+
+```{r}
+#Compare the distribution of reads lengths for multiple samples
+comparison_list <- list()
+comparison_list[["start_codon"]] <- reads_list[["Samp1"]][end5 <= cds_start & end3 >= cds_start]
+comparison_list[["whole_sample"]] <- reads_list[["Samp1"]]
+
+
+sample_list <- list("Only_start" = c("start_codon"),
+                    "All" = c("whole_sample"))
+
+example_length_dist_split <-  rlength_distr(comparison_list,
+                                            sample = sample_list,
+                                            multisamples = "average",
+                                            plot_style = "split",
+                                            colour = c("dodgerblue", "gray70"))
+example_length_dist_split[["plot"]]
+```
+
+
+```{r}
+#Other possible visualizations of two or more samples:
+example_length_dist_dodged <-  rlength_distr(comparison_list,
+                                             sample = sample_list, cl = 99,
+                                             multisamples = "average",
+                                             plot_style = "dodged",
+                                             colour = c("dodgerblue", "gray70"))
+example_length_dist_dodged[["plot"]]
+
+#Mirror images
+example_length_dist_mirrored <-  rlength_distr(comparison_list,
+                                               sample = sample_list,
+                                               cl = 99, multisamples = "average",
+                                               plot_style = "mirrored",
+                                               colour = c("dodgerblue", "gray70"))
+example_length_dist_mirrored[["plot"]]
+```
+
+```{r}
+#a combination of example 1 and 2: multiple samples and replicates.
+comparison_list <- list()
+comparison_list[["start_codon"]] <- reads_list[["Samp1"]][end5 <= cds_start & end3 >= cds_start]
+comparison_list[["whole_sample1"]] <- reads_list[["Samp1"]]
+comparison_list[["whole_sample2"]] <- reads_list[["Samp2"]]
+
+sample_list <- list("Only_start" = c("start_codon"),
+                    "All" = c("whole_sample1", "whole_sample2"))
+
+
+example_length_dist_split_rep <- rlength_distr(comparison_list,
+                                               sample = sample_list,
+                                               cl = 99, multisamples = "average",
+                                               plot_style = "split",
+                                               colour = c("dodgerblue", "gray70"))
+example_length_dist_split_rep[["plot"]]
+```
+
+
+```{r}
+#As for the previous plot, it is possible to restrict the graphical output to a 
+#sub-range of read lengths by specifying the cl parameter:
+example_ends_heatmap <- rends_heat(reads_list, mm81cdna, sample = "Samp1", cl = 85,
+                                   utr5l = 25, cdsl = 40, utr3l = 25)
+example_ends_heatmap[["plot"]]
+
+
+```
+
+```{r}
+#P-sites per region
+#reads_psite_list <- psite_info(reads_list, psite_offset)
+#example_psite_region[["plot"]]
+```
+#Ribosome profiling data should highlight the CDS of transcripts as the region 
+#with the higher percentage of reads. To verify this property the function 
+#region_psite computes the percentage of P-sites falling in the three annotated 
+#transcript regions (5' UTR, CDS and 3' UTR).
+
+```{r}
+#Trinucleotide periodicity
+example_frames_stratified <- frame_psite_length(reads_psite_list, sample = "Samp1",
+                                                region = "all", cl = 90)
+example_frames_stratified[["plot"]]
+
+example_frames <- frame_psite(reads_psite_list, sample = "Samp1", region = "all")
+example_frames[["plot"]]
+```
+#A fundamental characteristic of ribosome profiling data is the trinucleotide periodicity of ribosome footprints along coding sequences
+
+```{r}
+#Metaplot
+#A visual representation of the trinucleotide periodicity along coding sequences 
+#is provided by the function metaprofile_psite.
+
+example_metaprofile <- metaprofile_psite(reads_psite_list, mm81cdna, sample = "Samp1",
+                                         utr5l = 20, cdsl = 40, utr3l = 20,
+                                         plot_title = "sample.transcript")
+example_metaprofile[["plot_Samp1"]]
+
+
+example_metaprofile_28 <- metaprofile_psite(reads_psite_list, mm81cdna, sample = "Samp1",
+                                            length_range = 28,
+                                            utr5l = 20, cdsl = 40, utr3l = 20,
+                                            plot_title = "sample.transcript.length_range")
+example_metaprofile_28[["plot_Samp1"]]
+
+```
+
+
+```{r}
+#comparison_list <- list()
+#comparison_list[["subsample_28nt"]] <- reads_psite_list[["Samp1"]][length == 28]
+#comparison_list[["whole_sample"]] <- reads_psite_list[["Samp1"]]
+
+#example_metaprofile_split <- metaprofile_psite(comparison_list, mm81cdna, sample                                         = sample_list,
+                      #multisamples = "average",plot_style = "split",
+                   #utr5l = 20, cdsl = 40, utr3l = 20,
+                      #frequency = TRUE, plot_title = "transcript",
+                     #colour = c("aquamarine4", "gray70"))
+#example_metaprofile_split[["plot"]]
+```
+
+```{r}
+comparison_list <- list()
+comparison_list[["subsample_28nt"]] <- reads_psite_list[["Samp1"]][length == 28]
+comparison_list[["whole_sample"]] <- reads_psite_list[["Samp1"]]
+
+sample_list <- list("Only_28" = c("subsample_28nt"),
+                    "All" = c("whole_sample"))
+
+example_metaprofile_split <- metaprofile_psite(comparison_list, mm81cdna, sample                                             = sample_list,
+                                               multisamples = "average",                                plot_style = "split", utr5l = 20, cdsl = 40, utr3l = 20,
+                                               frequency = TRUE, plot_title =                                            "transcript",
+                                               colour = c("aquamarine4",                                                      "gray70"))
+example_metaprofile_split[["plot"]]
+```
+
+```{r}
+example_metaprofile_mirrored <- metaprofile_psite(comparison_list, mm81cdna,                                                     sample = sample_list,
+                                                  multisamples = "average",                                                   plot_style = "mirrored",
+                                                  utr5l = 20, cdsl = 40, utr3l =                                                        20,
+                                                  frequency = TRUE, plot_title =                                                   "transcript",
+                                                  colour = c("aquamarine4",                                                       "gray70"))
+example_metaprofile_mirrored[["plot"]]
+```
+
+#Comparison metaheatmap
+```{r}
+example_metaheatmap <- metaheatmap_psite(comparison_list, mm81cdna, sample =                                           sample_list,
+                                         utr5l = 20, cdsl = 40, utr3l = 20,                                              log_colour = F, 
+                                         plot_title = "Comparison metaheatmap")
+example_metaheatmap[["plot"]]
+```
+
+
+
+#Codon Usage Barplot
+#example_cu_barplot <- codon_usage_psite(reads_psite_list, mm81cdna, sample = "Samp1",
+                                        #fastapath =                 # "path/to/transcriptome/FASTA/file",
+                                        #fasta_genome = FALSE,
+                                        #frequency_normalization = FALSE) 
+#example_cu_barplot[["plot"]]
+
+#FASTA file is not included in the package
